@@ -7,9 +7,9 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 0px;
     }
     .question {
       margin-bottom: 30px;
@@ -40,14 +40,18 @@
       transition: background-color 0.3s;
     }
     .option:hover {
-      background-color: #ffffff;
+      background-color: #f0f8ff;
     }
-    .option.selected.correct {
+    .option.selected {
+      background-color: #e7f3ff;
+      border-left: 4px solid #007bff;
+    }
+    .option.correct {
       background-color: #d4edda;
       color: #155724;
       border-left: 4px solid #28a745;
     }
-    .option.selected.incorrect {
+    .option.incorrect {
       background-color: #f8d7da;
       color: #721c24;
       border-left: 4px solid #dc3545;
@@ -55,7 +59,7 @@
     .answer-input-container {
       margin-top: 15px;
       padding: 10px;
-      background-color: #dde9eb;
+      background-color: #f8f9fa;
       border-radius: 5px;
     }
     .answer-input {
@@ -112,7 +116,7 @@
   </style>
 </head>
 <body>
-<img src="https://raw.githubusercontent.com/kn302mm/kn302mm.github.io/refs/heads/main/image13.png" width="800" height="80">
+<img src="https://raw.githubusercontent.com/kn302mm/kn302mm.github.io/refs/heads/main/image13.png" width="900" height="80">
 <h1>Сетевые технологии: Финальный тест</h1>
 <div id="test-container"></div>
 <button id="check-results" class="show-results">Показать результаты</button>
@@ -2220,8 +2224,8 @@
     container.innerHTML = '';
 
     for (const [key, test] of Object.entries(testData)) {
-      userAnswers[key] = {
-        answer: '',
+      userAnswers[key] = userAnswers[key] || {
+        answers: [],
         isCorrect: false
       };
 
@@ -2250,15 +2254,23 @@
 
         const options = test.v.split('\n');
         options.forEach((option, index) => {
-          const optionId = `${key}-${index + 1}`;
+          const optionValue = (index + 1).toString();
+          const optionId = `${key}-${optionValue}`;
           const optionDiv = document.createElement('div');
           optionDiv.className = 'option';
           optionDiv.id = optionId;
           optionDiv.textContent = option.trim();
 
           optionDiv.onclick = function() {
-            handleOptionClick(key, (index + 1).toString(), optionDiv);
+            handleOptionClick(key, optionValue, optionDiv);
           };
+
+          // Восстанавливаем выбранные варианты
+          if (userAnswers[key].answers.includes(optionValue)) {
+            const isCorrect = test.a.includes(optionValue);
+            optionDiv.classList.add('selected');
+            optionDiv.classList.add(isCorrect ? 'correct' : 'incorrect');
+          }
 
           optionsDiv.appendChild(optionDiv);
         });
@@ -2275,6 +2287,7 @@
         answerInput.className = 'answer-input';
         answerInput.placeholder = 'Введите ваш ответ';
         answerInput.id = `input-${key}`;
+        answerInput.value = userAnswers[key].answers[0] || '';
         inputContainer.appendChild(answerInput);
 
         const checkButton = document.createElement('button');
@@ -2288,8 +2301,17 @@
         const feedbackDiv = document.createElement('div');
         feedbackDiv.className = 'answer-feedback';
         feedbackDiv.id = `feedback-${key}`;
-        inputContainer.appendChild(feedbackDiv);
 
+        // Восстанавливаем состояние проверки
+        if (userAnswers[key].answers.length > 0) {
+          feedbackDiv.textContent = userAnswers[key].isCorrect ?
+                  '✅ Правильно!' :
+                  `❌ Неверно. Правильный ответ: ${test.a.join(', ')}`;
+          feedbackDiv.className = `answer-feedback ${userAnswers[key].isCorrect ? 'answer-correct' : 'answer-incorrect'}`;
+          feedbackDiv.style.display = 'block';
+        }
+
+        inputContainer.appendChild(feedbackDiv);
         questionDiv.appendChild(inputContainer);
       }
 
@@ -2302,21 +2324,24 @@
     const question = testData[questionId];
     const isCorrect = question.a.includes(optionValue);
 
-    // Удаляем выделение у всех вариантов этого вопроса
-    const questionDiv = document.getElementById(`question-${questionId}`);
-    questionDiv.querySelectorAll('.option').forEach(opt => {
-      opt.classList.remove('selected', 'correct', 'incorrect');
-    });
+    // Проверяем, был ли уже выбран этот вариант
+    const wasSelected = userAnswers[questionId].answers.includes(optionValue);
 
-    // Выделяем выбранный вариант
-    optionElement.classList.add('selected');
-    optionElement.classList.add(isCorrect ? 'correct' : 'incorrect');
+    if (wasSelected) {
+      // Удаляем из выбранных
+      userAnswers[questionId].answers = userAnswers[questionId].answers.filter(a => a !== optionValue);
+      optionElement.classList.remove('selected', 'correct', 'incorrect');
+    } else {
+      // Добавляем к выбранным
+      userAnswers[questionId].answers.push(optionValue);
+      optionElement.classList.add('selected');
+      optionElement.classList.add(isCorrect ? 'correct' : 'incorrect');
+    }
 
-    // Сохраняем ответ
-    userAnswers[questionId] = {
-      answer: optionValue,
-      isCorrect: isCorrect
-    };
+    // Проверяем правильность всех выбранных ответов
+    const allCorrect = question.a.every(a => userAnswers[questionId].answers.includes(a)) &&
+            userAnswers[questionId].answers.every(a => question.a.includes(a));
+    userAnswers[questionId].isCorrect = allCorrect;
   }
 
   // Проверка ответа введенного вручную
@@ -2331,7 +2356,7 @@
 
     // Сохраняем результат
     userAnswers[questionId] = {
-      answer: userAnswer,
+      answers: [userAnswer],
       isCorrect: isCorrect
     };
 
